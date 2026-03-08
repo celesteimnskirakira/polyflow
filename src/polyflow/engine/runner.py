@@ -1,7 +1,9 @@
 from __future__ import annotations
+import time
 import yaml
 from pathlib import Path
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from polyflow.schema.workflow import Workflow
 from polyflow.engine.template import TemplateContext
@@ -18,6 +20,7 @@ async def run_workflow(
     user_input: str,
     config: Config,
     cwd: Path | None = None,
+    show_output: bool = True,
 ) -> TemplateContext:
     """
     Execute a workflow YAML file.
@@ -46,17 +49,23 @@ async def run_workflow(
     console.print()
 
     for step in workflow.steps:
+        t0 = time.monotonic()
         with Progress(SpinnerColumn(), TextColumn("{task.description}"), transient=True) as p:
             task_id = p.add_task(f"[cyan]{step.name}[/cyan]...")
             output = await execute_step(step, ctx, config)
             p.update(task_id, completed=True)
+        elapsed = time.monotonic() - t0
 
         if output is None:
             console.print(f"[yellow]⏭  {step.name} — skipped[/yellow]")
             continue
 
-        console.print(f"[green]✓[/green] {step.name}")
+        console.print(f"[green]✓[/green] {step.name}  [dim]{elapsed:.1f}s[/dim]")
         ctx.step_outputs[step.id] = output
+
+        if show_output:
+            preview = output[:400] + ("…" if len(output) > 400 else "")
+            console.print(Panel(preview, border_style="dim", padding=(0, 1)))
 
         # save_to: per-step output saving (future: individual step output config)
         # For now, honour workflow-level output.save_to after the last step.
