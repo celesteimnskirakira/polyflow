@@ -43,6 +43,8 @@ async def run_workflow(
         context_str=context_str,
     )
 
+    _workflow_start = time.monotonic()
+
     console.print(f"\n[bold green]▶ Running:[/bold green] {workflow.name}")
     if workflow.description:
         console.print(f"[dim]{workflow.description}[/dim]")
@@ -85,8 +87,29 @@ async def run_workflow(
     if workflow.output.save_to:
         _save_output(workflow, ctx)
 
-    console.print("\n[bold green]✓ Workflow complete.[/bold green]")
+    total_elapsed = time.monotonic() - _workflow_start
+    _print_run_summary(workflow, ctx, total_elapsed)
     return ctx
+
+
+def _print_run_summary(workflow: Workflow, ctx: TemplateContext, total_elapsed: float) -> None:
+    """Print a brief summary of which steps produced output and the total run time."""
+    step_count = len(ctx.step_outputs)
+    if step_count == 0:
+        console.print("\n[bold green]✓ Workflow complete.[/bold green]  [dim](no step output)[/dim]")
+        return
+
+    step_ids = list(ctx.step_outputs.keys())
+    # Show short preview of each step output length
+    parts = [f"[bold]{sid}[/bold] ({len(ctx.step_outputs[sid])} chars)" for sid in step_ids]
+    summary = ", ".join(parts)
+
+    console.print(
+        f"\n[bold green]✓ Workflow complete.[/bold green]  "
+        f"[dim]{step_count} step{'s' if step_count != 1 else ''} · "
+        f"{total_elapsed:.1f}s total[/dim]"
+    )
+    console.print(f"  [dim]Outputs: {summary}[/dim]")
 
 
 def _save_output(workflow: Workflow, ctx: TemplateContext) -> None:

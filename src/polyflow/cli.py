@@ -109,9 +109,10 @@ def _list_local_workflows() -> list[tuple[str, str, str]]:
 
 # ─── Commands ─────────────────────────────────────────────────────────────────
 
-@click.group(context_settings={"help_option_names": ["-h", "--help"]})
+@click.group(context_settings={"help_option_names": ["-h", "--help"]}, invoke_without_command=True)
 @click.version_option(__version__, prog_name="polyflow")
-def main():
+@click.pass_context
+def main(ctx):
     """
     Polyflow — define, run and share multi-model AI workflows in YAML.
 
@@ -124,7 +125,50 @@ def main():
     \b
     Docs & examples: https://github.com/celesteimnskirakira/polyflow
     """
-    pass
+    if ctx.invoked_subcommand is None:
+        _show_welcome()
+        console.print(ctx.get_help())
+
+
+def _show_welcome() -> None:
+    """Print a Rich welcome panel when polyflow is run with no arguments."""
+    from rich.panel import Panel
+    from rich.text import Text
+
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    config = load_config()
+
+    title = Text(f"Polyflow v{__version__}", style="bold cyan")
+
+    if api_key or config.uses_openrouter:
+        status_line = "[bold green]Ready![/bold green]  Try: [bold]polyflow list[/bold]"
+    else:
+        status_line = (
+            "[bold yellow]Setup needed.[/bold yellow]  "
+            "Set [bold]OPENROUTER_API_KEY=sk-or-...[/bold] or run [bold]polyflow init[/bold]\n"
+            "  Get a free key at [link=https://openrouter.ai]https://openrouter.ai[/link]"
+        )
+
+    quick_ref = (
+        "\n[dim]Quick reference:[/dim]\n"
+        "  [bold]polyflow list[/bold]                    Browse local workflows\n"
+        "  [bold]polyflow run <name> -i \"..\"[/bold]     Run a workflow\n"
+        "  [bold]polyflow new \"...\"[/bold]              Generate workflow with AI\n"
+        "  [bold]polyflow onboard <tool>[/bold]          Generate workflow for any tool\n"
+        "  [bold]polyflow doctor[/bold]                  Check setup\n"
+        "  [bold]polyflow init[/bold]                    Configure API keys\n"
+    )
+
+    console.print()
+    console.print(
+        Panel(
+            f"  {status_line}{quick_ref}",
+            title=title,
+            border_style="cyan",
+            padding=(0, 1),
+        )
+    )
+    console.print()
 
 
 @main.command()
@@ -405,7 +449,12 @@ def _show_yaml(yaml_content: str, wf_name: str, step_ids: list[str]) -> None:
     )
 
 
-def _interactive_new(initial_description: str, save_path: str | None, config) -> None:
+def _interactive_new(
+    initial_description: str,
+    save_path: str | None,
+    config,
+    _override_generate_fn=None,
+) -> None:
     import yaml as _yaml
     from pydantic import ValidationError
     from polyflow.schema.workflow import Workflow
@@ -426,10 +475,13 @@ def _interactive_new(initial_description: str, save_path: str | None, config) ->
     yaml_content: str = ""
     wf: Workflow | None = None
 
+    # Use override generate function if provided (e.g. from onboard command)
+    generate_fn = _override_generate_fn if _override_generate_fn else _generate_yaml
+
     while True:
         # ── Generate ──────────────────────────────────────────────────────────
         with console.status("[cyan]Generating...[/cyan]"):
-            yaml_content = _generate_yaml(description, history, config)
+            yaml_content = generate_fn(description, history, config)
 
         try:
             raw = _yaml.safe_load(yaml_content)
@@ -448,6 +500,7 @@ def _interactive_new(initial_description: str, save_path: str | None, config) ->
             console.print("  [bold]What next?[/bold]")
             console.print("  [bold cyan][r][/bold cyan] Run it now")
             console.print("  [bold cyan][s][/bold cyan] Save to file")
+            console.print("  [bold cyan][p][/bold cyan] Push to community (share)")
             console.print("  [bold cyan][e][/bold cyan] Refine (describe changes)")
             console.print("  [bold cyan][q][/bold cyan] Quit")
         else:
@@ -479,6 +532,26 @@ def _interactive_new(initial_description: str, save_path: str | None, config) ->
             console.print()
             return
 
+        # ── Push to community ─────────────────────────────────────────────────
+        elif choice == "p" and valid and wf:
+            default_name = wf.name + ".yaml"
+            out_path = Path(save_path or click.prompt("  Save as before sharing", default=default_name))
+            out_path.write_text(yaml_content, encoding="utf-8")
+            console.print(f"\n  [dim]Saved to {out_path}[/dim]")
+            from click.testing import CliRunner as _CliRunner
+            # Invoke share command inline
+            token = os.environ.get("GITHUB_TOKEN", "")
+            if not token:
+                console.print(
+                    "\n  [yellow]⚠ GITHUB_TOKEN not set.[/yellow] "
+                    "Create one at: https://github.com/settings/tokens/new\n"
+                    "  Then: [bold]export GITHUB_TOKEN=ghp_...[/bold]\n"
+                    "  Or run: [bold]polyflow share " + str(out_path) + "[/bold]\n"
+                )
+            else:
+                asyncio.run(_do_share(out_path, wf, token, None))
+            return
+
         # ── Refine ────────────────────────────────────────────────────────────
         elif choice == "e":
             refinement = click.prompt("  Describe what to change").strip()
@@ -493,6 +566,192 @@ def _interactive_new(initial_description: str, save_path: str | None, config) ->
         elif choice == "q":
             console.print()
             return
+
+
+@main.command()
+@click.argument("tool_or_url")
+@click.option("--output", "-o", default=None, help="Save path (skips interactive menu)")
+def onboard(tool_or_url: str, output: str | None):
+    """
+    Generate a workflow by onboarding any tool or docs URL.
+
+    \b
+    Accepts a tool name (e.g. "cursor", "supabase") or a direct docs URL.
+    Fetches the documentation and generates a personalized Polyflow workflow.
+
+    \b
+    Examples:
+      polyflow onboard cursor
+      polyflow onboard supabase
+      polyflow onboard https://docs.example.com/api
+    """
+    config = load_config()
+    if not config.uses_openrouter and not config.api_keys:
+        err_console.print(
+            "[yellow]⚠ No API keys found.[/yellow] "
+            "Set [bold]OPENROUTER_API_KEY[/bold] or run [bold]polyflow init[/bold]."
+        )
+        sys.exit(1)
+
+    _interactive_onboard(tool_or_url, output, config)
+
+
+def _fetch_url_content(url: str) -> str:
+    """Fetch a URL and strip HTML tags to get plain text."""
+    import httpx
+    import re
+
+    with console.status(f"[cyan]Fetching {url}...[/cyan]"):
+        try:
+            resp = httpx.get(url, timeout=15, follow_redirects=True,
+                             headers={"User-Agent": "polyflow-onboard/1.0"})
+            resp.raise_for_status()
+            html = resp.text
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch {url}: {e}")
+
+    # Strip HTML tags and collapse whitespace
+    text = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<style[^>]*>.*?</style>", " ", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"&[a-zA-Z]+;", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:6000]  # limit to avoid huge prompts
+
+
+def _search_tool_docs(tool_name: str) -> tuple[str, str]:
+    """
+    Search for a tool's documentation using DuckDuckGo instant answers API.
+    Returns (abstract_text, abstract_url).
+    """
+    import httpx
+
+    with console.status(f"[cyan]Searching docs for '{tool_name}'...[/cyan]"):
+        try:
+            resp = httpx.get(
+                "https://api.duckduckgo.com/",
+                params={
+                    "q": f"{tool_name} documentation",
+                    "format": "json",
+                    "no_html": "1",
+                    "no_redirect": "1",
+                },
+                timeout=10,
+                headers={"User-Agent": "polyflow-onboard/1.0"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            return (f"Tool: {tool_name}", "")
+
+    abstract = data.get("AbstractText", "") or ""
+    abstract_url = data.get("AbstractURL", "") or ""
+
+    # If we got a URL, fetch more content from it
+    if abstract_url:
+        try:
+            page_text = _fetch_url_content(abstract_url)
+            combined = f"{abstract}\n\n{page_text}" if abstract else page_text
+            return combined[:6000], abstract_url
+        except Exception:
+            pass
+
+    # Fall back to related topics
+    if not abstract:
+        topics = data.get("RelatedTopics", [])
+        snippets = []
+        for t in topics[:5]:
+            if isinstance(t, dict) and t.get("Text"):
+                snippets.append(t["Text"])
+        abstract = "\n".join(snippets) or f"Tool documentation for: {tool_name}"
+
+    return abstract[:6000], abstract_url
+
+
+def _generate_onboard_yaml(tool_name: str, docs_content: str, docs_url: str, config) -> str:
+    """Generate a Polyflow workflow tailored to a tool, given its docs."""
+    source_hint = f"(from {docs_url})" if docs_url else ""
+    prompt = (
+        f"Generate a Polyflow workflow to help a developer use the tool: {tool_name} {source_hint}.\n\n"
+        f"Here is documentation / context about the tool:\n"
+        f"---\n{docs_content[:4000]}\n---\n\n"
+        f"Create a practical workflow that adapts {tool_name} to a typical developer project. "
+        f"Make it immediately useful, with clear step names and prompts."
+    )
+
+    if config.uses_openrouter:
+        from openai import OpenAI
+        from polyflow.models.openrouter import OPENROUTER_BASE_URL
+        client = OpenAI(api_key=config.openrouter_api_key, base_url=OPENROUTER_BASE_URL)
+        raw = client.chat.completions.create(
+            model="anthropic/claude-sonnet-4-5",
+            max_tokens=2048,
+            messages=[
+                {"role": "system", "content": _NEW_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        ).choices[0].message.content
+    else:
+        import anthropic
+        client = anthropic.Anthropic(api_key=config.get_api_key("claude"))
+        raw = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            system=_NEW_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompt}],
+        ).content[0].text
+
+    raw = raw.strip()
+    if raw.startswith("```"):
+        lines = raw.splitlines()
+        raw = "\n".join(ln for ln in lines if not ln.startswith("```")).strip()
+    return raw
+
+
+def _interactive_onboard(tool_or_url: str, save_path: str | None, config) -> None:
+    import yaml as _yaml
+    from pydantic import ValidationError
+    from polyflow.schema.workflow import Workflow
+
+    console.print(f"\n  [bold]Polyflow Onboard — {tool_or_url}[/bold]")
+    console.print("  [dim]Fetching docs and generating workflow...[/dim]\n")
+
+    # Detect URL vs tool name
+    if tool_or_url.startswith("http://") or tool_or_url.startswith("https://"):
+        docs_url = tool_or_url
+        try:
+            docs_content = _fetch_url_content(docs_url)
+        except RuntimeError as e:
+            err_console.print(f"[red]✗ {e}[/red]")
+            sys.exit(1)
+        tool_name = docs_url.split("/")[2].replace("www.", "").replace("docs.", "")
+    else:
+        tool_name = tool_or_url
+        docs_content, docs_url = _search_tool_docs(tool_name)
+
+    if not docs_content:
+        console.print(f"  [yellow]⚠ No documentation found for '{tool_name}'.[/yellow]")
+        console.print("  Try passing the docs URL directly, e.g.:")
+        console.print(f"  [bold]polyflow onboard https://docs.{tool_name}.com[/bold]\n")
+        sys.exit(1)
+
+    console.print(f"  [green]✓[/green] Got docs ({len(docs_content)} chars)" +
+                  (f" from [dim]{docs_url}[/dim]" if docs_url else ""))
+    console.print()
+
+    # Generate the workflow (reuse _interactive_new logic from here).
+    # Override only for the first generation (no history); refinements fall back to normal LLM.
+    def _onboard_generate(desc: str, hist: list, cfg) -> str:
+        if not hist:  # first generation: use tool docs
+            return _generate_onboard_yaml(tool_name, docs_content, docs_url, cfg)
+        return _generate_yaml(desc, hist, cfg)  # refinement pass: use standard generator
+
+    _interactive_new(
+        initial_description=f"Tool onboarding workflow for {tool_name}",
+        save_path=save_path,
+        config=config,
+        _override_generate_fn=_onboard_generate,
+    )
 
 
 @main.command()
