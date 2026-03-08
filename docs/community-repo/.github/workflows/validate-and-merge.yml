@@ -21,8 +21,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install Polyflow
-        run: pip install polyflow-ai
+      - name: Install dependencies
+        run: pip install pyyaml
 
       - name: Validate changed workflows
         run: |
@@ -34,10 +34,9 @@ jobs:
             if [[ "$file" == workflows/*.yaml ]]; then
               echo ""
               echo "── Validating: $file"
-              if polyflow validate "$file"; then
+              if python validate_workflow.py "$file"; then
                 echo "   ✓ valid"
               else
-                echo "   ✗ FAILED"
                 FAILED=1
               fi
             fi
