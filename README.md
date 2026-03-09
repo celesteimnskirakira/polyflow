@@ -345,13 +345,32 @@ polyflow list --tag security     # filter by tag
 
 ## Models
 
-| Alias | Model | Provider |
-|---|---|---|
-| `claude` | Claude Sonnet 4.6 | Anthropic / OpenRouter |
-| `gemini` | Gemini 2.0 Flash | Google / OpenRouter |
-| `gpt-4` | GPT-4o | OpenAI / OpenRouter |
+**Stable aliases** (recommended defaults, used in all built-in workflows):
 
-**Recommended:** [OpenRouter](https://openrouter.ai) — one API key, all three models, no juggling.
+| Alias | Model | Best for |
+|---|---|---|
+| `claude` | Claude Sonnet 4.6 | Analysis, writing, reasoning |
+| `gemini` | Gemini 2.0 Flash | Speed, cost efficiency |
+| `gpt-4` | GPT-4o | Code, structured output |
+
+**Premium aliases** (opt-in, higher cost):
+
+| Alias | Model | When to use |
+|---|---|---|
+| `claude-opus` | Claude Opus 4.6 | Hardest reasoning tasks |
+| `gpt-5` | GPT-5.4 | OpenAI flagship ($20/1M output) |
+| `gemini-pro` | Gemini 3.1 Pro | 1M token context window |
+
+You can also use **any OpenRouter model ID directly** in your YAML — no alias needed:
+
+```yaml
+model: openai/gpt-5.4
+model: anthropic/claude-opus-4-6
+model: google/gemini-3.1-pro
+model: meta-llama/llama-3.3-70b-instruct   # 290+ models on OpenRouter
+```
+
+**Recommended:** [OpenRouter](https://openrouter.ai) — one API key, all models.
 
 ---
 
