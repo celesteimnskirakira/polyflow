@@ -1,6 +1,6 @@
 ---
 name: polyflow
-description: Run multi-model AI workflows using the polyflow CLI. Sends the same task to Claude, Gemini, and GPT-4 in parallel and synthesizes consensus results. Use for code review, security audits, cross-validation, or any task where comparing multiple model outputs improves reliability over a single model's answer.
+description: Run parallel multi-model AI workflows using the polyflow CLI. Sends the same task to multiple models simultaneously and synthesizes consensus results. Use for code review, security audits, cross-validation, or any task where comparing multiple model outputs improves reliability over a single model's answer.
 version: 1.0.0
 metadata:
   openclaw:

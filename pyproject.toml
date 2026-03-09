@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "polyflow-ai"
 version = "0.1.0"
-description = "Multi-model AI workflow engine for developers"
+description = "Parallel multi-model AI workflows — consensus beats any single model"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Polyflow Contributors"}]

@@ -23,7 +23,7 @@ inputs:
     required: false
     default: 'latest'
   openrouter-api-key:
-    description: 'OpenRouter API key — covers Claude, Gemini, and GPT-4 with a single key'
+    description: 'OpenRouter API key — one key covers all models (Claude, Gemini, GPT-4, and 290+ more)'
     required: false
   anthropic-api-key:
     description: 'Anthropic API key (for Claude, if not using OpenRouter)'
