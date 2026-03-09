@@ -3,11 +3,10 @@
 [![PyPI version](https://img.shields.io/pypi/v/polyflow-ai.svg)](https://pypi.org/project/polyflow-ai/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#)
 
 **Multiple models check the same thing. Consensus beats any single AI.**
 
-Run Claude, Gemini, and GPT-4 in parallel on the same task — they cross-validate each other, vote on findings, and synthesize a final answer. No single model's blind spots. No boilerplate. Describe what you want in plain English.
+Run any combination of AI models in parallel on the same task — they cross-validate each other, vote on findings, and synthesize a final answer. No single model's blind spots. Describe what you want in plain English, or write a YAML file.
 
 ```bash
 pip install polyflow-ai
@@ -16,12 +15,11 @@ export OPENROUTER_API_KEY=sk-or-...
 # Use a built-in workflow
 polyflow run code-review-multi-model -i "$(git diff HEAD~1)"
 
-# Or describe what you want — Polyflow generates the workflow
-polyflow new "multiple models audit my API for security issues, vote on findings" -o audit.yaml
-polyflow run ./audit.yaml -i "$(cat src/api.py)"
+# Or generate one from natural language
+polyflow new "multiple models audit my API for security issues, vote on findings"
 ```
 
-Or as a GitHub Action on every PR — fully automated, no human in the loop required:
+Add to any repo as a GitHub Action — every PR reviewed automatically:
 
 ```yaml
 - uses: celesteimnskirakira/polyflow@main
@@ -35,18 +33,18 @@ Or as a GitHub Action on every PR — fully automated, no human in the loop requ
 
 ## Why multiple models?
 
-No AI model is right 100% of the time. But when Claude, Gemini, and GPT-4 **all agree**, that's a signal worth trusting. When they disagree, that's where the interesting problems are.
+No model is right 100% of the time. But when multiple models **all agree**, that's a signal worth trusting. When they disagree, that's where the real problems are.
 
 ```
-Single model:  Claude says "no security issues"   → might have blind spots
+Single model:    Claude says "no security issues"   → might have blind spots
 
-Multiple models:  Claude says "no security issues"
-                  Gemini finds SQL injection          → consensus surfaces the real finding
-                  GPT-4 finds missing auth check
-                  Claude synthesizes final report
+Multiple models: Claude says "no security issues"
+                 Gemini finds SQL injection          → consensus surfaces the real finding
+                 GPT-4 finds missing auth check
+                 Claude synthesizes final report
 ```
 
-This isn't about needing humans to be smarter than AI. It's about **models checking each other** — the same principle behind code review, peer review, and ensemble methods in ML.
+This is **ensemble learning applied to developer workflows** — the same principle behind code review, peer review, and ML ensembles.
 
 ---
 
@@ -56,61 +54,43 @@ This isn't about needing humans to be smarter than AI. It's about **models check
 pip install polyflow-ai
 ```
 
-Requires Python 3.11+.
-
-**One key covers all models** (recommended):
+Requires Python 3.11+. One key covers all models:
 
 ```bash
-export OPENROUTER_API_KEY=sk-or-...    # openrouter.ai — Claude + Gemini + GPT-4
-```
-
-Or configure per-model:
-
-```bash
-polyflow init     # interactive setup
-polyflow doctor   # verify everything works
+export OPENROUTER_API_KEY=sk-or-...    # openrouter.ai — 290+ models, one key
+polyflow doctor                         # verify setup
 ```
 
 ---
 
 ## Quick Start
 
-**Option A — describe what you want (no YAML required):**
-
 ```bash
-# Natural language → workflow YAML → run
+# Browse 22 built-in workflows
+polyflow list
+polyflow list --tag security
+
+# Run a workflow
+polyflow run code-review-multi-model -i "$(git diff HEAD~1)"
+polyflow run security-audit -i "$(cat src/auth.py)"
+polyflow run bug-triage -i "TypeError: 'NoneType' object is not subscriptable"
+
+# Generate a custom workflow from natural language
 polyflow new "multiple models review my API design, vote on findings" -o api-review.yaml
 polyflow run ./api-review.yaml -i "$(cat src/api.py)"
 
-# Or generate and run interactively
-polyflow new
-```
-
-**Option B — use a built-in workflow:**
-
-```bash
-# Browse 22 ready-to-use workflows
-polyflow list
-
-# Code review: Claude + Gemini + GPT-4 in parallel
-polyflow run code-review-multi-model -i "$(git diff HEAD~1)"
-
-# Security audit with consensus findings
-polyflow run security-audit -i "$(cat src/auth.py)"
-
-# Bug triage across models
-polyflow run bug-triage -i "TypeError: 'NoneType' object is not subscriptable in auth.py:42"
+# Run headlessly in CI/CD
+polyflow run <workflow> --ci -i "..."
 ```
 
 ---
 
 ## How It Works
 
-The core primitive is a **parallel step with aggregation** — send the same prompt to multiple models, collect results, synthesize:
+Send the same prompt to multiple models in parallel, then aggregate:
 
 ```yaml
 name: security-consensus
-description: "Multiple models find vulnerabilities. Consensus = high confidence."
 
 steps:
   - id: audit
@@ -126,12 +106,11 @@ steps:
         model: gpt-4
         prompt: "Find security vulnerabilities (OWASP Top 10): {{input}}"
     aggregate:
-      mode: vote            # findings all models agree on = high confidence
-      model: claude         # Claude writes the final synthesized report
+      mode: vote       # only findings all models agree on
+      model: claude    # Claude writes the final report
       prompt: |
         Multiple models independently audited this code.
-        Synthesize their findings. Mark consensus findings as HIGH CONFIDENCE.
-        Disagreements as NEEDS REVIEW.
+        Mark consensus findings as HIGH CONFIDENCE, disagreements as NEEDS REVIEW.
         {{aggregated}}
 
 output:
@@ -139,99 +118,76 @@ output:
   save_to: security-report.md
 ```
 
-Run it anywhere — terminal, CI/CD, GitHub Actions — with no human approval needed:
+| Aggregate mode | When to use |
+|---|---|
+| `vote` | Highest confidence — only what all models agree on |
+| `diff` | Show where models disagree — good for exploring trade-offs |
+| `summary` | One model synthesizes all outputs into a single report |
+| `raw` | Return all outputs separately |
 
-```bash
-polyflow run security-consensus --ci -i "$(cat src/auth.py)"
+Chain steps for sequential pipelines:
+
+```yaml
+steps:
+  - id: find_issues
+    type: parallel
+    steps: [...]
+    aggregate:
+      mode: vote
+      model: claude
+
+  - id: generate_fix
+    model: claude
+    prompt: |
+      Consensus issues: {{steps.find_issues.output}}
+      Write a fix for each HIGH CONFIDENCE issue.
+      Code: {{input}}
 ```
 
 ---
 
 ## Customize
 
-### Change which models run in parallel
+### Use any model
 
-Open any workflow YAML and edit the `model` field in each parallel step. The number of steps = the number of models that run simultaneously.
-
-**Two models instead of three:**
-```yaml
-steps:
-  - id: review
-    type: parallel
-    steps:
-      - id: claude_view
-        model: claude
-        prompt: "Review this code: {{input}}"
-      - id: gemini_view
-        model: gemini
-        prompt: "Review this code: {{input}}"
-    aggregate:
-      mode: diff
-      model: claude
-```
-
-**Four models:**
-```yaml
-    steps:
-      - id: claude_view
-        model: claude
-        prompt: "..."
-      - id: gemini_view
-        model: gemini
-        prompt: "..."
-      - id: gpt4_view
-        model: gpt-4
-        prompt: "..."
-      - id: opus_view
-        model: claude-opus      # premium alias
-        prompt: "..."
-```
-
-### Use a premium or different model
-
-Replace the alias with any model name — either a Polyflow alias or a full OpenRouter model ID:
+Any [OpenRouter model ID](https://openrouter.ai/models) works directly in YAML:
 
 ```yaml
-# Polyflow premium aliases
-model: claude-opus    # Claude Opus 4.6
-model: gpt-5          # GPT-5.4
-model: gemini-pro     # Gemini 3.1 Pro (1M context)
-
-# Any OpenRouter model ID (290+ models available)
-model: openai/gpt-5.4
-model: anthropic/claude-opus-4-6
-model: deepseek/deepseek-r2
+model: claude          # Claude Sonnet 4.6 (default)
+model: gemini          # Gemini 2.0 Flash
+model: gpt-4           # GPT-4o
+model: claude-opus     # Claude Opus 4.6 (premium)
+model: gpt-5           # GPT-5.4 (premium)
+model: deepseek/deepseek-r2          # any OpenRouter model ID
 model: meta-llama/llama-3.3-70b-instruct
 ```
 
-### Start from a built-in workflow
+### Change the number of models
 
-The fastest way to write a custom workflow is to copy an existing one:
+Edit the `steps` list inside a `type: parallel` block — add or remove sub-steps freely:
 
-```bash
-# Copy a built-in workflow to edit
-polyflow list                                    # find one you like
-cp ~/.polyflow/workflows/security-audit.yaml ./my-audit.yaml
-
-# Or export directly
-polyflow run security-audit --dry-run -i "test"  # preview what it does
-
-# Edit, validate, run
-polyflow validate ./my-audit.yaml
-polyflow run ./my-audit.yaml -i "$(cat src/auth.py)"
+```yaml
+- id: review
+  type: parallel
+  steps:
+    - id: model_a
+      model: claude
+      prompt: "Review: {{input}}"
+    - id: model_b
+      model: gemini
+      prompt: "Review: {{input}}"
+    # add more models here
+  aggregate:
+    mode: diff
+    model: claude
 ```
 
 ### Change aggregate mode
 
-`mode: vote` — findings all models agree on (highest confidence, fewer results)
-`mode: diff` — everything, with disagreements highlighted (more results, needs review)
-`mode: summary` — all outputs synthesized into one report (no diff view)
-`mode: raw` — outputs returned separately, no synthesis
-
 ```yaml
 aggregate:
-  mode: vote       # change this
-  model: claude    # which model writes the final synthesis (optional)
+  mode: vote       # vote | diff | summary | raw
+  model: claude    # which model writes the synthesis (optional)
   prompt: |        # custom synthesis prompt (optional)
     Summarize findings. Mark consensus items as HIGH CONFIDENCE.
     {{aggregated}}
@@ -239,127 +195,18 @@ aggregate:
 
 ---
 
-## Core Concepts
-
-### Parallel Steps + Aggregation
-
-The engine that makes multi-model consensus work:
-
-```yaml
-- id: cross_validate
-  type: parallel
-  steps:
-    - id: model_a
-      model: claude
-      prompt: "..."
-    - id: model_b
-      model: gemini
-      prompt: "..."
-    - id: model_c
-      model: gpt-4
-      prompt: "..."
-  aggregate:
-    mode: vote        # vote | diff | summary | raw
-    model: claude     # synthesis model (optional)
-    prompt: "Synthesize: {{aggregated}}"
-```
-
-| Aggregate mode | When to use |
-|---|---|
-| `vote` | Find what all models agree on — highest confidence findings |
-| `diff` | Show where models disagree — useful for exploring trade-offs |
-| `summary` | Let a fourth model synthesize all outputs into one report |
-| `raw` | Return all outputs separately for manual inspection |
-
-### Template Expressions
-
-| Expression | Description |
-|---|---|
-| `{{input}}` | Input passed with `-i` |
-| `{{steps.step_id.output}}` | Output from a previous step |
-| `{{aggregated}}` | Combined output inside an `aggregate.prompt` |
-| `{{vars.key}}` | Workflow variable |
-| `{{context}}` | Injected file/directory context |
-| `{{a \| b}}` | Fallback: use `b` if `a` is empty |
-
-### Sequential + Conditional Pipelines
-
-Chain parallel consensus results into further steps:
-
-```yaml
-steps:
-  - id: find_issues
-    type: parallel          # multiple models find issues
-    steps: [...]
-    aggregate:
-      mode: vote
-      model: claude
-
-  - id: generate_fix        # Claude writes the fix based on consensus
-    model: claude
-    prompt: |
-      Consensus issues found:
-      {{steps.find_issues.output}}
-
-      Write a fix for each HIGH CONFIDENCE issue.
-      Input code: {{input}}
-```
-
-### Human-in-the-Loop (optional)
-
-For decisions that require human authority — not because AI isn't smart enough, but because you want explicit sign-off:
-
-```yaml
-hitl:
-  message: "Consensus finding: SQL injection in auth.py. Deploy fix?"
-  options: [deploy, review-first, abort]
-  show: raw
-```
-
-Skip entirely in automated pipelines with `--ci`:
-
-```bash
-polyflow run my-workflow --ci -i "..."   # HITL auto-approves, never blocks
-```
-
-### Context Injection
-
-Automatically include project files in prompts:
-
-```yaml
-context:
-  inject_cwd: true
-  inject_files:
-    - "src/**/*.py"
-    - "README.md"
-  max_file_size: 50kb
-```
-
-### Error Handling
-
-```yaml
-on_error:
-  retry: 2
-  fallback: continue    # abort | continue | skip
-```
-
-Retries use exponential backoff. Rate-limit errors (429) retry automatically; auth errors (401, 403) fail fast.
-
----
-
 ## CLI Reference
 
 ```
-polyflow list [--tag security]       Browse available workflows
-polyflow run <name|path> -i "..."    Run a workflow
-polyflow run <name> --ci -i "..."    Run headlessly (no prompts, auto-approve)
-polyflow validate <file.yaml>        Validate workflow YAML
-polyflow new "description" -o f.yaml Generate from natural language
-polyflow pull <name>                 Download from community registry
-polyflow search                      List community workflows
-polyflow init                        Configure API keys
-polyflow doctor                      Check your setup
-polyflow schema                      Show full YAML schema reference
+polyflow new "description" -o f.yaml  Generate workflow from natural language
+polyflow run <name|path> -i "..."     Run a workflow
+polyflow run <name> --ci -i "..."     Run headlessly (CI/CD mode)
+polyflow list [--tag security]        Browse built-in workflows
+polyflow validate <file.yaml>         Validate a workflow file
+polyflow pull <name>                  Download from community registry
+polyflow init                         Configure API keys
+polyflow doctor                       Check your setup
+polyflow schema                       Show full YAML schema
 ```
 
 ---
@@ -372,88 +219,59 @@ Add multi-model consensus to any repo in 30 seconds.
 
 | Secret | Description |
 |---|---|
-| `OPENROUTER_API_KEY` | Covers Claude + Gemini + GPT-4 (recommended) |
+| `OPENROUTER_API_KEY` | All models via [openrouter.ai](https://openrouter.ai) (recommended) |
 | `ANTHROPIC_API_KEY` | Claude only |
 | `GOOGLE_API_KEY` | Gemini only |
 | `OPENAI_API_KEY` | GPT-4 only |
 
-**2. Copy a workflow file into `.github/workflows/`:**
+**2. Add a workflow file to `.github/workflows/`:**
 
 | File | Trigger | What it does |
 |---|---|---|
-| [polyflow-code-review.yml](.github/workflows/polyflow-code-review.yml) | Pull request | multi-model parallel review posted as PR comment |
+| [polyflow-code-review.yml](.github/workflows/polyflow-code-review.yml) | Pull request | Multi-model review posted as PR comment |
 | [polyflow-security-audit.yml](.github/workflows/polyflow-security-audit.yml) | Push to main / weekly | Consensus security audit, opens issue on critical findings |
 | [polyflow-pr-description.yml](.github/workflows/polyflow-pr-description.yml) | PR opened | Auto-generates PR description from diff |
 
-**3. That's it.** Every PR now gets reviewed by three AI models simultaneously.
-
-### Custom workflow in Actions
-
-```yaml
-- uses: celesteimnskirakira/polyflow@main
-  with:
-    workflow: ./my-workflow.yaml      # built-in name or local path
-    input: ${{ steps.diff.outputs.content }}
-    output-file: report.md
-    openrouter-api-key: ${{ secrets.OPENROUTER_API_KEY }}
-```
-
-### Action inputs / outputs
-
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `workflow` | ✅ | — | Workflow name or `.yaml` path |
-| `input` | | `""` | Input string (`-i` flag) |
-| `output-file` | | — | Save output to file |
-| `version` | | `latest` | Pin `polyflow-ai` version |
-| `openrouter-api-key` | | — | OpenRouter (all models) |
-| `anthropic-api-key` | | — | Claude only |
-| `google-api-key` | | — | Gemini only |
-| `openai-api-key` | | — | GPT-4 only |
-
-| Output | Description |
-|---|---|
-| `result` | Workflow output text |
-| `output-file` | Path to saved output file |
+**3. Done.**
 
 ---
 
 ## Available Workflows (22 built-in)
 
-| Workflow | Models | Description |
-|---|---|---|
-| `code-review-multi-model` | Claude + Gemini + GPT-4 | Parallel review, consensus findings |
-| `security-audit` | Claude + Gemini | OWASP-based vulnerability analysis |
-| `cross-validate` | Claude + Gemini + GPT-4 | Plan → parallel validation → synthesize |
-| `bug-triage` | Claude + Gemini | Severity classification + fix suggestions |
-| `test-generation` | Claude + GPT-4 | Unit test generation with coverage analysis |
-| `pr-description` | Claude | Auto-generate PR descriptions from diffs |
-| `feature-spec` | Claude + Gemini | User story → technical specification |
-| `adr-generator` | Claude + Gemini | Architecture Decision Record |
-| `incident-postmortem` | Claude + GPT-4 | Structured incident analysis |
-| `api-documentation` | Claude | OpenAPI documentation generation |
-| `database-schema-design` | Claude + Gemini | Schema design with normalization review |
-| `deploy-checklist` | Claude + Gemini + GPT-4 | Pre-deployment readiness check |
-| `changelog-generator` | Claude | Conventional commit → changelog |
-| `dependency-audit` | Claude + Gemini | Vulnerability + license analysis |
-| `performance-analysis` | Claude + GPT-4 | Bottleneck identification |
-| `microservice-design` | Claude + Gemini | Service boundary design |
-| `data-pipeline-design` | Claude + GPT-4 | ETL/streaming architecture |
-| `technical-interview` | Claude + GPT-4 | Interview question generation |
-| `content-moderation` | Claude + Gemini + GPT-4 | Multi-model policy review |
-| `api-spec-design` | Claude + Gemini | REST API spec from requirements |
-| `code-refactoring` | Claude + GPT-4 | Refactoring plan with safety analysis |
-
 ```bash
-polyflow list                    # browse all
-polyflow list --tag security     # filter by tag
+polyflow list               # see all
+polyflow list --tag security
 ```
+
+| Workflow | Description |
+|---|---|
+| `code-review-multi-model` | Parallel review, consensus findings |
+| `security-audit` | OWASP-based vulnerability analysis |
+| `cross-validate` | Plan → parallel validation → synthesize |
+| `bug-triage` | Severity classification + fix suggestions |
+| `test-generation` | Unit test generation with coverage analysis |
+| `pr-description` | Auto-generate PR descriptions from diffs |
+| `feature-spec` | User story → technical specification |
+| `adr-generator` | Architecture Decision Record |
+| `incident-postmortem` | Structured incident analysis |
+| `api-documentation` | OpenAPI documentation generation |
+| `database-schema-design` | Schema design with normalization review |
+| `deploy-checklist` | Pre-deployment readiness check |
+| `changelog-generator` | Conventional commit → changelog |
+| `dependency-audit` | Vulnerability + license analysis |
+| `performance-analysis` | Bottleneck identification |
+| `microservice-design` | Service boundary design |
+| `data-pipeline-design` | ETL/streaming architecture |
+| `technical-interview` | Interview question generation |
+| `content-moderation` | Multi-model policy review |
+| `api-spec-design` | REST API spec from requirements |
+| `code-refactoring` | Refactoring plan with safety analysis |
 
 ---
 
 ## Models
 
-**Stable aliases** (recommended defaults, used in all built-in workflows):
+**Stable aliases** (used in all built-in workflows):
 
 | Alias | Model | Best for |
 |---|---|---|
@@ -461,51 +279,15 @@ polyflow list --tag security     # filter by tag
 | `gemini` | Gemini 2.0 Flash | Speed, cost efficiency |
 | `gpt-4` | GPT-4o | Code, structured output |
 
-**Premium aliases** (opt-in, higher cost):
+**Premium aliases** (opt-in):
 
-| Alias | Model | When to use |
-|---|---|---|
-| `claude-opus` | Claude Opus 4.6 | Hardest reasoning tasks |
-| `gpt-5` | GPT-5.4 | OpenAI flagship ($20/1M output) |
-| `gemini-pro` | Gemini 3.1 Pro | 1M token context window |
+| Alias | Model |
+|---|---|
+| `claude-opus` | Claude Opus 4.6 |
+| `gpt-5` | GPT-5.4 |
+| `gemini-pro` | Gemini 3.1 Pro (1M context) |
 
-You can also use **any OpenRouter model ID directly** in your YAML — no alias needed:
-
-```yaml
-model: openai/gpt-5.4
-model: anthropic/claude-opus-4-6
-model: google/gemini-3.1-pro
-model: meta-llama/llama-3.3-70b-instruct   # 290+ models on OpenRouter
-```
-
-**Recommended:** [OpenRouter](https://openrouter.ai) — one API key, all models.
-
----
-
-## Architecture
-
-```
-YAML workflow
-    ↓
-Pydantic validation (schema/workflow.py)
-    ↓
-Jinja2-style template engine (engine/template.py)
-    ↓
-Async executor (engine/executor.py)
-    ├── Sequential steps
-    ├── Parallel steps → asyncio.gather (true concurrency)
-    │     └── Aggregation → vote | diff | summary | raw
-    ├── Human-in-the-Loop (optional)
-    └── Conditional skip
-    ↓
-Model adapters (models/)
-    ├── OpenRouter (unified — recommended)
-    ├── Claude (Anthropic SDK)
-    ├── Gemini (google-genai)
-    └── GPT-4 (openai)
-    ↓
-Output saving (markdown | json | text)
-```
+Or use any [OpenRouter model ID](https://openrouter.ai/models) directly — 290+ models available.
 
 ---
 
@@ -518,7 +300,7 @@ Workflows are plain YAML — no code required.
 3. Validate: `polyflow validate your-workflow.yaml`
 4. Open a PR
 
-**The best workflows use at least two models** to demonstrate the cross-validation value. Single-model workflows are fine for sequential pipelines but miss the point of Polyflow.
+**The best contributions use at least two models** with aggregation — that's what makes Polyflow different from single-model tools.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
