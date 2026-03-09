@@ -1,5 +1,5 @@
 name: 'Polyflow'
-description: 'Run multi-model AI workflows (Claude + Gemini + GPT-4) from a YAML file'
+description: 'Parallel multi-model AI workflows — consensus beats any single model'
 author: 'Polyflow Contributors'
 
 branding:
