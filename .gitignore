@@ -5,3 +5,4 @@ dist/
 build/
 .env
 *.yaml.tmp
+docs/community-repo/
