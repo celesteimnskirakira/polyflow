@@ -98,15 +98,20 @@ async def run_workflow(
         console.print(f"[green]✓[/green] {step.name}  [dim]{elapsed:.1f}s[/dim]")
         ctx.step_outputs[step.id] = output
 
-        if show_output:
+        # Show preview only when HITL won't already display the content
+        if show_output and not (step.hitl and step.hitl.show):
             preview = output[:400] + ("…" if len(output) > 400 else "")
             console.print(Panel(preview, border_style="dim", padding=(0, 1)))
 
         if step.hitl:
+            # Cap content shown in HITL panel to avoid overwhelming the terminal
+            hitl_content = ""
+            if step.hitl.show:
+                hitl_content = output[:2000] + ("\n\n[…truncated]" if len(output) > 2000 else "")
             result = prompt_hitl(
                 message=step.hitl.message,
                 options=step.hitl.options,
-                content=output if step.hitl.show else "",
+                content=hitl_content,
             )
             ctx.hitl_choices[step.id] = {"choice": result.choice, "note": result.note}
             if result.choice == "abort":

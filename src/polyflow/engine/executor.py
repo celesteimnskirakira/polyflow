@@ -71,7 +71,6 @@ async def execute_step(step: Step, ctx: TemplateContext, config: Config) -> Opti
 
 async def execute_parallel(step: Step, ctx: TemplateContext, config: Config) -> str:
     """Execute sub-steps in parallel, aggregate results."""
-    timeout_secs = _parse_timeout(step.timeout)
 
     async def run_substep(sub):
         adapter = get_model_adapter(sub.model, config)
@@ -88,7 +87,23 @@ async def execute_parallel(step: Step, ctx: TemplateContext, config: Config) -> 
 
     results = await asyncio.gather(*[run_substep(s) for s in step.steps])
     outputs = {sid: out for sid, out in results if out is not None}
-    return _aggregate(outputs, step)
+    aggregated = _aggregate(outputs, step)
+
+    # If aggregate.model is set, use that model to produce a final summary
+    if step.aggregate and step.aggregate.model:
+        agg_prompt = step.aggregate.prompt or (
+            "Synthesize the following parallel model outputs into a single concise summary:\n\n"
+            + aggregated
+        )
+        adapter = get_model_adapter(step.aggregate.model, config)
+        api_key = config.get_api_key(step.aggregate.model)
+        timeout_secs = _parse_timeout(step.timeout)
+        aggregated = await asyncio.wait_for(
+            adapter.complete(agg_prompt, api_key=api_key, timeout=int(timeout_secs)),
+            timeout=timeout_secs,
+        )
+
+    return aggregated
 
 
 def _aggregate(outputs: dict[str, str], step: Step) -> str:

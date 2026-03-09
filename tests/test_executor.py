@@ -53,6 +53,33 @@ async def test_execute_parallel_step(config):
 
 
 @pytest.mark.asyncio
+async def test_aggregate_model_calls_llm(config):
+    """aggregate.model triggers an LLM summarization call after parallel substeps."""
+    step = Step(
+        id="validate",
+        name="Validate",
+        type="parallel",
+        steps=[
+            SubStep(id="a", model="claude", prompt="Review A"),
+            SubStep(id="b", model="gemini", prompt="Review B"),
+        ],
+        aggregate=AggregateConfig(mode="diff", model="claude"),
+    )
+    ctx = TemplateContext(input="test")
+
+    with patch("polyflow.engine.executor.get_model_adapter") as mock_get:
+        mock_adapter = AsyncMock()
+        # First two calls = substep completions, third = aggregate summary
+        mock_adapter.complete = AsyncMock(side_effect=["A output", "B output", "Final summary"])
+        mock_get.return_value = mock_adapter
+
+        result = await execute_parallel(step, ctx, config)
+
+    assert result == "Final summary"
+    assert mock_adapter.complete.call_count == 3
+
+
+@pytest.mark.asyncio
 async def test_conditional_step_skipped(config):
     """Steps with a false `if` condition should be skipped."""
     step = Step(
