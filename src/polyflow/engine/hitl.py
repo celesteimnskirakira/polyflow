@@ -17,6 +17,8 @@ _SHORTCUTS = {"c": "continue", "a": "abort", "r": "revise", "s": "skip"}
 
 def prompt_hitl(message: str, options: list[str], content: str = "") -> HitlResult:
     """Display model output and prompt for human confirmation."""
+    if not options:
+        raise ValueError("HITL options list cannot be empty")
     if content:
         console.print(Panel(content, title="[bold cyan]Model Output[/bold cyan]", expand=False))
 

@@ -11,7 +11,7 @@ class OnError(BaseModel):
 
 class HitlConfig(BaseModel):
     message: str
-    options: list[str] = ["continue", "abort"]
+    options: list[str] = Field(default=["continue", "abort"], min_length=1)
     timeout: str = "10m"
     show: Optional[Literal["diff", "summary", "raw"]] = None
 
