@@ -1,22 +1,27 @@
 # Contributing to Polyflow
 
-## Adding a Workflow
+## The Best Contribution: A Multi-Model Workflow
 
-The easiest way to contribute is adding a new workflow to `workflows/examples/`.
+The highest-value contribution is a workflow that uses **at least two models in parallel** with aggregation — that's what makes Polyflow different from any other tool.
+
+A good workflow demonstrates one of:
+- Three models checking the same thing → `aggregate.mode: vote` → consensus findings
+- Two models with different perspectives → `aggregate.mode: diff` → highlights disagreements
+- Parallel analysis → one model synthesizes → better output than any single model
 
 **Steps:**
 1. Fork the repository
 2. Create `workflows/examples/your-workflow-name.yaml`
-3. Validate it: `polyflow validate workflows/examples/your-workflow-name.yaml`
-4. Test it with a real input
+3. Validate: `polyflow validate workflows/examples/your-workflow-name.yaml`
+4. Test with a real input and document it in your PR
 5. Open a pull request
 
 **Workflow conventions:**
-- Use lowercase kebab-case for filenames
+- Lowercase kebab-case filenames
 - Include `name`, `description`, `version`, and `tags`
-- Add a `tags` field so users can filter with `polyflow list --tag <tag>`
-- Make prompts detailed and reusable (use `{{input}}` for user-provided content)
-- Test with multiple models if using parallel steps
+- Use `{{input}}` for user-provided content
+- Parallel steps should use `aggregate.mode: vote` or `diff`, not just `raw`
+- Prompts should be specific, not generic
 
 **Example tags:** `code-review`, `security`, `documentation`, `testing`, `design`, `ops`, `data`
 
@@ -25,10 +30,10 @@ The easiest way to contribute is adding a new workflow to `workflows/examples/`.
 Open an issue at https://github.com/celesteimnskirakira/polyflow/issues
 
 Include:
-- Your Polyflow version (`polyflow --version`)
-- Output of `polyflow doctor`
+- Polyflow version: `polyflow --version`
+- Setup check: `polyflow doctor`
 - The workflow YAML (if applicable)
-- The full error message
+- Full error message
 
 ## Development Setup
 
@@ -37,11 +42,11 @@ git clone https://github.com/celesteimnskirakira/polyflow
 cd polyflow
 pip install -e ".[dev]"
 
-# Run tests (unit tests, no API key needed)
-pytest tests/test_config.py tests/test_executor.py tests/test_schema.py tests/test_template.py
+# Unit tests — no API key needed
+pytest tests/ -k "not integration"
 
-# Run integration tests (requires OPENROUTER_API_KEY)
-pytest tests/test_integration.py
+# All tests — requires OPENROUTER_API_KEY
+pytest tests/
 ```
 
 ## Code Style
@@ -49,5 +54,6 @@ pytest tests/test_integration.py
 - Python 3.11+, type hints throughout
 - `from __future__ import annotations` in all modules
 - Pydantic v2 for schema validation
-- `asyncio` for all I/O operations
+- `asyncio` for all I/O — no blocking calls in async paths
 - Rich for terminal output
+- New features need tests

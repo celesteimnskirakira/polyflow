@@ -2,9 +2,11 @@
 
 ## What This Is
 
-Polyflow is a CLI tool and GitHub Action that runs Claude, Gemini, and GPT-4 **in parallel on the same task**, defined in a single YAML file.
+Polyflow is a CLI tool and GitHub Action that runs Claude, Gemini, and GPT-4 **in parallel on the same task** — they cross-validate each other, vote on findings, and synthesize a final answer. Defined in a single YAML file.
 
-The core problem it solves: developers manually copy prompts to multiple AI services to cross-check results — Addy Osmani (Google Chrome engineering director) named this behavior **"Model Musical Chairs."** Polyflow automates it.
+**The core insight:** No single AI model is right 100% of the time. But when three models agree, that's a signal worth trusting. When they disagree, that's where the real problems are. This is **multi-model consensus** — the same principle behind ensemble methods in ML, applied to developer workflows.
+
+The workflow it automates: developers manually copying prompts to multiple AI services ("Model Musical Chairs" — Addy Osmani, Google). Polyflow makes this a YAML file you run in one command, fully automated, no human approval needed.
 
 ```bash
 pip install polyflow-ai
@@ -19,13 +21,15 @@ No other tool has all five of these simultaneously:
 
 | Feature | Why it matters |
 |---|---|
-| **Parallel multi-model execution** | Claude + Gemini + GPT-4 on the same prompt at the same time — not sequential, not a single model |
-| **YAML-declarative workflows** | Version-controllable, shareable, readable by non-Python developers |
-| **Human-in-the-Loop (HITL) checkpoints** | Pause execution for human approval at any step — first-class primitive |
-| **GitHub Action (`action.yml`)** | One line of YAML in any repo to get AI-powered CI/CD |
-| **`pip install` CLI** | No server, no signup, no GUI — works in terminals and scripts |
+| **Parallel multi-model execution** | Claude + Gemini + GPT-4 on the same prompt simultaneously — true concurrency via asyncio.gather |
+| **Multi-model consensus/aggregation** | `mode: vote` surfaces what all models agree on; `mode: diff` shows where they disagree |
+| **YAML-declarative workflows** | Version-controllable, shareable, diff-able — not Python code |
+| **GitHub Action (`action.yml`)** | One `uses:` line in any repo to get consensus AI reviews on every PR |
+| **`pip install` CLI + `--ci` mode** | Works headlessly in terminals, scripts, and CI/CD with zero human intervention |
 
-The closest competitors: OpenClaw (single model, no CI/CD), LangChain (Python boilerplate, no parallel multi-model), CodeRabbit/BugBot/Graphite (single model, SaaS pricing, no YAML).
+**HITL (Human-in-the-Loop)** exists as an optional primitive for decisions that require explicit human authority — not because humans are smarter, but for accountability and control. It is NOT the primary differentiator.
+
+The closest competitors: OpenClaw (single model, no CI/CD, security vulnerabilities), LangChain (Python boilerplate, no parallel multi-model), CodeRabbit/BugBot/Graphite (single model, SaaS pricing, no YAML).
 
 ---
 
@@ -72,19 +76,19 @@ action.yml            GitHub Action composite action
 ## Development Priorities
 
 ### P0 — Core stability (do not break)
-- `polyflow run` with parallel steps
+- `polyflow run` with parallel steps + `aggregate.mode: vote/diff/summary`
 - OpenRouter adapter (most users will use this)
-- HITL checkpoints
-- `--ci` flag (used by GitHub Action)
-- `action.yml`
+- `--ci` flag (used by GitHub Action, enables headless execution)
+- `action.yml` (GitHub Action)
 
 ### P1 — Next features (Issues already filed)
 - `type: loop` — iterative PDCA loops with termination condition ([#1](https://github.com/celesteimnskirakira/polyflow/issues/1))
 - `type: shell` — local command execution for full PDCA automation ([#2](https://github.com/celesteimnskirakira/polyflow/issues/2))
 
 ### P2 — Growth
-- GitHub Marketplace listing (action.yml is ready)
-- More built-in workflows for the `polyflow list` showcase
+- GitHub Marketplace listing (`action.yml` is ready — submit now)
+- `polyflow-mcp` — MCP server so Polyflow can be called from GitHub Agentic Workflows
+- More built-in workflows showcasing multi-model consensus
 - Workflow registry (`polyflow pull <name>`) as community grows
 
 ---
@@ -92,13 +96,17 @@ action.yml            GitHub Action composite action
 ## What NOT to Build
 
 - **A GUI or web interface** — CLI-first is the positioning. Keep it.
-- **An autonomous agent** — That's OpenClaw. Polyflow is declarative and controlled.
+- **An autonomous agent** — That's OpenClaw. Polyflow is declarative and auditable.
 - **A SaaS platform** — Open source + GitHub Action is the distribution strategy.
-- **Single-model workflows** — Every new built-in workflow should use at least 2 models or demonstrate HITL. Single-model is what every other tool already does.
+- **Single-model workflows** — Every new built-in workflow should use at least 2 models with aggregation. Single-model is what every other tool already does.
+- **HITL as a selling point** — HITL is a useful primitive but not the differentiator. Lead with consensus, mention HITL as optional control.
 
 ---
 
 ## Key Design Decisions
+
+**Why multi-model consensus instead of single-model?**
+No model is right 100% of the time. Three models checking the same thing surfaces blind spots no single model has. `mode: vote` = high-confidence findings. `mode: diff` = where to pay attention. This is ensemble learning applied to developer workflows.
 
 **Why YAML over Python DSL?**
 YAML workflows are version-controllable, PR-reviewable, and writable by non-engineers. Python DSLs (LangChain, CrewAI) require 80+ lines of boilerplate for what Polyflow does in 20 lines of YAML.
@@ -106,11 +114,11 @@ YAML workflows are version-controllable, PR-reviewable, and writable by non-engi
 **Why OpenRouter as default?**
 One API key covers Claude + Gemini + GPT-4. Reduces friction from 3 signups to 1.
 
-**Why HITL as first-class primitive?**
-Multi-model parallel execution is most valuable when a human can inspect the diff between model outputs and decide whether to continue. HITL + parallel is the core loop.
+**Why `--ci` mode?**
+Polyflow runs fully headlessly in CI/CD. HITL is optional. `--ci` auto-approves any HITL checkpoint, so all workflows work in GitHub Actions without modification.
 
-**Why `--ci` auto-approves HITL?**
-CI/CD pipelines can't wait for human input. `--ci` auto-chooses `continue` (or first option), making all workflows safe to run headlessly.
+**Why HITL at all?**
+For high-stakes decisions where you want explicit human authority — not because the human knows more, but because accountability matters. Deploy to prod, delete data, send external communication. Always optional, never required for technical workflows.
 
 ---
 
