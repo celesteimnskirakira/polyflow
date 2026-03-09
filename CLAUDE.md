@@ -4,7 +4,7 @@
 
 Polyflow is a CLI tool and GitHub Action that runs Claude, Gemini, and GPT-4 **in parallel on the same task** — they cross-validate each other, vote on findings, and synthesize a final answer. Defined in a single YAML file.
 
-**The core insight:** No single AI model is right 100% of the time. But when three models agree, that's a signal worth trusting. When they disagree, that's where the real problems are. This is **multi-model consensus** — the same principle behind ensemble methods in ML, applied to developer workflows.
+**The core insight:** No single AI model is right 100% of the time. But when multiple models agree, that's a signal worth trusting. When they disagree, that's where the real problems are. This is **multi-model consensus** — the same principle behind ensemble methods in ML, applied to developer workflows.
 
 The workflow it automates: developers manually copying prompts to multiple AI services ("Model Musical Chairs" — Addy Osmani, Google). Polyflow makes this a YAML file you run in one command, fully automated, no human approval needed.
 
@@ -106,7 +106,7 @@ action.yml            GitHub Action composite action
 ## Key Design Decisions
 
 **Why multi-model consensus instead of single-model?**
-No model is right 100% of the time. Three models checking the same thing surfaces blind spots no single model has. `mode: vote` = high-confidence findings. `mode: diff` = where to pay attention. This is ensemble learning applied to developer workflows.
+No model is right 100% of the time. Multiple models checking the same thing surfaces blind spots no single model has. `mode: vote` = high-confidence findings. `mode: diff` = where to pay attention. This is ensemble learning applied to developer workflows.
 
 **Why YAML over Python DSL?**
 YAML workflows are version-controllable, PR-reviewable, and writable by non-engineers. Python DSLs (LangChain, CrewAI) require 80+ lines of boilerplate for what Polyflow does in 20 lines of YAML.

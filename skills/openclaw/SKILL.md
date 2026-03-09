@@ -18,7 +18,7 @@ metadata:
         bins: [polyflow]
 ---
 
-Run parallel multi-model AI workflows. Three models analyze the same task simultaneously — consensus beats any single AI.
+Run parallel multi-model AI workflows. Multiple models analyze the same task simultaneously — consensus beats any single AI.
 
 ## Setup
 

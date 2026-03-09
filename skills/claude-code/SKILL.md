@@ -3,7 +3,7 @@ name: polyflow
 description: Use when running parallel multi-model AI workflows — code review, security audit, cross-validation, or any task where consensus across models is more reliable than a single model's answer. Invoke when the user says "run polyflow", "multi-model review", "parallel AI analysis", "compare models", or wants multiple AI perspectives on the same input.
 ---
 
-Run parallel multi-model AI workflows using the `polyflow` CLI. Three models check the same thing simultaneously — consensus findings are more reliable than any single model's output.
+Run parallel multi-model AI workflows using the `polyflow` CLI. Multiple models check the same thing simultaneously — consensus findings are more reliable than any single model's output.
 
 ## Setup
 
@@ -25,7 +25,7 @@ polyflow run cross-validate -i "your design or problem statement"
 polyflow run <workflow> --ci -i "..."
 
 # Generate a custom workflow from natural language
-polyflow new "three models review my API design, vote on findings" -o api-review.yaml
+polyflow new "multiple models review my API design, vote on findings" -o api-review.yaml
 polyflow new "claude and gemini cross-validate my code, diff mode"
 
 # Browse 22 built-in workflows
@@ -76,11 +76,11 @@ steps:
         model: gpt-4
         prompt: "Review this and list issues: {{input}}"
     aggregate:
-      mode: vote            # high-confidence: all three agree
+      mode: vote            # high-confidence: all models agree
       model: claude         # Claude synthesizes the final report
       prompt: |
-        Three models independently reviewed this.
-        Synthesize findings. Mark items all three flagged as HIGH CONFIDENCE.
+        Multiple models independently reviewed this.
+        Synthesize findings. Mark items all models flagged as HIGH CONFIDENCE.
         {{aggregated}}
 
 output:
@@ -92,7 +92,7 @@ Run it: `polyflow run ./my-consensus-review.yaml -i "your input"`
 
 ## GitHub Actions integration
 
-Add three-model consensus to any repo:
+Add multi-model consensus to any repo:
 
 ```yaml
 - uses: celesteimnskirakira/polyflow@main

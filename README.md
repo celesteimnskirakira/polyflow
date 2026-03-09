@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#)
 
-**Three models check the same thing. Consensus beats any single AI.**
+**Multiple models check the same thing. Consensus beats any single AI.**
 
 Run Claude, Gemini, and GPT-4 in parallel on the same task — they cross-validate each other, vote on findings, and synthesize a final answer. No single model's blind spots. No boilerplate. Describe what you want in plain English.
 
@@ -17,7 +17,7 @@ export OPENROUTER_API_KEY=sk-or-...
 polyflow run code-review-multi-model -i "$(git diff HEAD~1)"
 
 # Or describe what you want — Polyflow generates the workflow
-polyflow new "three models audit my API for security issues, vote on findings" -o audit.yaml
+polyflow new "multiple models audit my API for security issues, vote on findings" -o audit.yaml
 polyflow run ./audit.yaml -i "$(cat src/api.py)"
 ```
 
@@ -33,17 +33,17 @@ Or as a GitHub Action on every PR — fully automated, no human in the loop requ
 
 ---
 
-## Why three models?
+## Why multiple models?
 
 No AI model is right 100% of the time. But when Claude, Gemini, and GPT-4 **all agree**, that's a signal worth trusting. When they disagree, that's where the interesting problems are.
 
 ```
 Single model:  Claude says "no security issues"   → might have blind spots
 
-Three models:  Claude says "no security issues"
-               Gemini finds SQL injection          → consensus surfaces the real finding
-               GPT-4 finds missing auth check
-               Claude synthesizes final report
+Multiple models:  Claude says "no security issues"
+                  Gemini finds SQL injection          → consensus surfaces the real finding
+                  GPT-4 finds missing auth check
+                  Claude synthesizes final report
 ```
 
 This isn't about needing humans to be smarter than AI. It's about **models checking each other** — the same principle behind code review, peer review, and ensemble methods in ML.
@@ -58,7 +58,7 @@ pip install polyflow-ai
 
 Requires Python 3.11+.
 
-**One key covers all three models** (recommended):
+**One key covers all models** (recommended):
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...    # openrouter.ai — Claude + Gemini + GPT-4
@@ -79,7 +79,7 @@ polyflow doctor   # verify everything works
 
 ```bash
 # Natural language → workflow YAML → run
-polyflow new "three models review my API design, vote on findings" -o api-review.yaml
+polyflow new "multiple models review my API design, vote on findings" -o api-review.yaml
 polyflow run ./api-review.yaml -i "$(cat src/api.py)"
 
 # Or generate and run interactively
@@ -110,7 +110,7 @@ The core primitive is a **parallel step with aggregation** — send the same pro
 
 ```yaml
 name: security-consensus
-description: "Three models find vulnerabilities. Consensus = high confidence."
+description: "Multiple models find vulnerabilities. Consensus = high confidence."
 
 steps:
   - id: audit
@@ -126,10 +126,10 @@ steps:
         model: gpt-4
         prompt: "Find security vulnerabilities (OWASP Top 10): {{input}}"
     aggregate:
-      mode: vote            # findings all three agree on = high confidence
+      mode: vote            # findings all models agree on = high confidence
       model: claude         # Claude writes the final synthesized report
       prompt: |
-        Three models independently audited this code.
+        Multiple models independently audited this code.
         Synthesize their findings. Mark consensus findings as HIGH CONFIDENCE.
         Disagreements as NEEDS REVIEW.
         {{aggregated}}
@@ -289,7 +289,7 @@ Chain parallel consensus results into further steps:
 ```yaml
 steps:
   - id: find_issues
-    type: parallel          # three models find issues
+    type: parallel          # multiple models find issues
     steps: [...]
     aggregate:
       mode: vote
@@ -366,7 +366,7 @@ polyflow schema                      Show full YAML schema reference
 
 ## GitHub Actions
 
-Add three-model consensus to any repo in 30 seconds.
+Add multi-model consensus to any repo in 30 seconds.
 
 **1. Add to GitHub Secrets** (`Settings → Secrets → Actions`):
 
@@ -381,7 +381,7 @@ Add three-model consensus to any repo in 30 seconds.
 
 | File | Trigger | What it does |
 |---|---|---|
-| [polyflow-code-review.yml](.github/workflows/polyflow-code-review.yml) | Pull request | 3-model parallel review posted as PR comment |
+| [polyflow-code-review.yml](.github/workflows/polyflow-code-review.yml) | Pull request | multi-model parallel review posted as PR comment |
 | [polyflow-security-audit.yml](.github/workflows/polyflow-security-audit.yml) | Push to main / weekly | Consensus security audit, opens issue on critical findings |
 | [polyflow-pr-description.yml](.github/workflows/polyflow-pr-description.yml) | PR opened | Auto-generates PR description from diff |
 
