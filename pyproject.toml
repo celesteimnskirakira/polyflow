@@ -3,9 +3,23 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "polyflow"
+name = "polyflow-ai"
 version = "0.1.0"
 description = "Multi-model AI workflow engine for developers"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Polyflow Contributors"}]
+keywords = ["ai", "workflow", "llm", "claude", "gemini", "gpt-4", "automation", "yaml"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.1",

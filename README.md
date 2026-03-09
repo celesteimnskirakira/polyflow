@@ -3,14 +3,14 @@
 [![PyPI version](https://img.shields.io/pypi/v/polyflow-ai.svg)](https://pypi.org/project/polyflow-ai/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-59%20passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-64%20passing-brightgreen.svg)](#)
 
 **Run multi-model AI workflows in a single YAML file.**
 
 Combine Claude, Gemini, and GPT-4 — parallel or sequential — with human checkpoints, template variables, and output saving. No boilerplate, no SDK juggling.
 
 ```
-pip install polyflow
+pip install polyflow-ai
 export OPENROUTER_API_KEY=sk-or-...
 polyflow run code-review-multi-model -i "$(git diff HEAD~1)"
 ```
@@ -32,7 +32,7 @@ Polyflow makes this a **20-line YAML file** you can save, share, and version-con
 ## Install
 
 ```bash
-pip install polyflow
+pip install polyflow-ai
 ```
 
 Requires Python 3.11+.
